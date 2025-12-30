@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 
+// Oyun ikonu çeken yardımcı fonksiyon
 async function getGameIcon(placeId) {
     try {
         const url = `https://thumbnails.roblox.com/v1/places/gameicons?placeIds=${placeId}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`;
@@ -12,20 +13,26 @@ async function getGameIcon(placeId) {
     }
 }
 
-app.get('/api/search', async (req, res) => {
-    const query = req.query.q || 'deneme';
+// Ana arama rotası
+app.get('/', async (req, res) => {
+    const query = req.query.q;
     const limit = parseInt(req.query.limit) || 10;
 
-    const searchUrl = `https://apis.roblox.com/search-api/omni-search?searchQuery=${encodeURIComponent(query)}&sessionId=vercel_node`;
+    // Eğer sorgu boşsa örnek kullanım göster
+    if (!query) {
+        return res.json({ 
+            message: "Hoşgeldin! Aramak için ?q=oyun_adi&limit=5 şeklinde parametre ekle.",
+            example: "/?q=adopt&limit=2" 
+        });
+    }
 
     try {
+        const searchUrl = `https://apis.roblox.com/search-api/omni-search?searchQuery=${encodeURIComponent(query)}&sessionId=test`;
         const response = await axios.get(searchUrl);
         const rawResults = response.data.searchResults[0]?.contents || [];
         
-        // Limite göre kes
         const limitedResults = rawResults.slice(0, limit);
 
-        // Her oyunun ikonunu çek (Promise.all ile hızlı işlem)
         const finalData = await Promise.all(limitedResults.map(async (item) => {
             const placeId = item.rootPlaceId;
             if (!placeId) return null;
@@ -39,14 +46,17 @@ app.get('/api/search', async (req, res) => {
 
         res.json({
             status: "success",
-            query: query,
             count: finalData.filter(x => x !== null).length,
             results: finalData.filter(x => x !== null)
         });
 
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
+
+// Vercel için port ayarı
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server hazır: ${PORT}`));
 
 module.exports = app;
